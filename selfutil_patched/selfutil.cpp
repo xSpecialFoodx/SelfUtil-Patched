@@ -20,12 +20,13 @@
 
 void print_usage()
 {
-	printf("selfutil [--input] [--output] [--dry-run] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
+	printf("selfutil [--input] [--output] [--dry-run] [--verbose] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
 }
 
 string input_file_path = "";
 string output_file_path = "";
 bool dry_run = false;
+bool verbose = false;
 bool patch_first_segment_duplicate = true;
 Elf64_Off patch_first_segment_safety_percentage = 10;// min amount of cells (in percentage) that should fit in other words
 bool patch_version_segment = true;
@@ -68,6 +69,8 @@ int main(int argc, char* argv[])
 			}
 			else if (args[inputted_args_index] == "--dry-run")
 				dry_run = true;
+			else if (args[inputted_args_index] == "--verbose")
+				verbose = true;
 			else if (args[inputted_args_index] == "--not-patch-first-segment-duplicate")
 				patch_first_segment_duplicate = false;
 			else if (args[inputted_args_index] == "--not-patch-version-segment")
@@ -100,15 +103,14 @@ int main(int argc, char* argv[])
 		}
 
 		printf(
-			"%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n"
+			"%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n"
 			, "Input File Name", input_file_path.c_str()
 			, "Output File Name", fixed_output_file_path.c_str()
 			, "Dry Run", ((dry_run == true) ? "True" : "False")
+			, "Verbose", ((verbose == true) ? "True" : "False")
 			, "Patch First Segment Duplicate", ((patch_first_segment_duplicate == true) ? "True" : "False")
 			, "Patch Version Segment", ((patch_version_segment == true) ? "True" : "False")
 			);
-
-		printf("\n");
 
 		SelfUtil util(input_file_path);
 
@@ -173,7 +175,11 @@ bool SelfUtil::Load(string filePath)
 
 bool SelfUtil::SaveToELF(string savePath)
 {
-	printf("\nSaveToELF(\"%s\")\n", savePath.c_str());
+	if (verbose == true)
+	{
+		printf("\n");
+		printf("SaveToELF(\"%s\")\n", savePath.c_str());
+	}
 
 	Elf64_Off first = 777777777, last = 0;
 	size_t saveSize = 0;
@@ -191,8 +197,12 @@ bool SelfUtil::SaveToELF(string savePath)
 	}
 	saveSize = AlignUp<size_t>(saveSize, PS4_PAGE_SIZE);
 
-	printf("Save Size: %d bytes (0x%X) \n", saveSize, saveSize);
-	printf("first , last : %llX , %llX \n", first, last);
+	if (verbose == true)
+	{
+		printf("\n");
+		printf("Save Size: %d bytes (0x%X)\n", saveSize, saveSize);
+		printf("first: %llX, last: %llX\n", first, last);
+	}
 
 	save.clear();
 	save.resize(saveSize);
@@ -238,7 +248,8 @@ bool SelfUtil::SaveToELF(string savePath)
 			method_found = false;
 
 			if (ph->p_filesz != NULL && ph->p_filesz != ee->memSz)
-				printf("idx: %d SEGMENT size: %d != phdr size: %d \n", phIdx, ee->memSz, ph->p_filesz);
+				if (verbose == true)
+					printf("idx: %d SEGMENT size: %d != phdr size: %d \n", phIdx, ee->memSz, ph->p_filesz);
 
 			void* srcp = NULL;
 			void* dstp = (void*)((unat)pd + ph->p_offset);
@@ -251,11 +262,12 @@ bool SelfUtil::SaveToELF(string savePath)
 				printf("\n");
 				printf("patching version segment\n");
 
-				printf(
-					"%s: 0x%08llX\t%s: 0x%08llX\n"
-					, "segment address", data.capacity() - ph->p_filesz
-					, "segment size", ph->p_filesz
-					);
+				if (verbose == true)
+					printf(
+						"%s: 0x%08llX\t%s: 0x%08llX\n"
+						, "segment address", data.capacity() - ph->p_filesz
+						, "segment size", ph->p_filesz
+						);
 
 				srcp = (void*)((unat)&data[0] + data.capacity() - ph->p_filesz);
 				datasize = ph->p_filesz;
@@ -283,11 +295,12 @@ bool SelfUtil::SaveToELF(string savePath)
 				printf("\n");
 				printf("patching version segment\n");
 
-				printf(
-					"%s: 0x%08llX\t%s: 0x%08llX\n"
-					, "segment address", data.capacity() - ph->p_filesz
-					, "segment size", ph->p_filesz
-					);
+				if (verbose == true)
+					printf(
+						"%s: 0x%08llX\t%s: 0x%08llX\n"
+						, "segment address", data.capacity() - ph->p_filesz
+						, "segment size", ph->p_filesz
+						);
 
 				void* srcp = (void*)((unat)&data[0] + data.capacity() - ph->p_filesz);
 				void* dstp = (void*)((unat)pd + ph->p_offset);
@@ -304,6 +317,13 @@ bool SelfUtil::SaveToELF(string savePath)
 			{
 				printf("\n");
 				printf("patching first segment duplicate\n");
+
+				if (verbose == true)
+					printf(
+						"%s: 0x%08X\t%s: 0x%08X\n"
+						, "address", first_index
+						, "size", first - first_index
+						);
 
 				set_u8_array(pd + first_index, 0, first - first_index);
 
@@ -356,12 +376,12 @@ bool SelfUtil::Parse()
 
 		const auto se = entries.back();
 
-		printf("Segment[%02d] P:%08X ",
-			seIdx, se->props);
-
-		printf(" (id: %X) ", (se->props >> 20));
-		printf("@ 0x%016llX +%llX   (mem: %llX)\n",
-			se->offs, se->fileSz, se->memSz);
+		if (verbose == true)
+		{
+			printf("Segment[%02d] P:%08X ", seIdx, se->props);
+			printf(" (id: %X) ", (se->props >> 20));
+			printf("@ 0x%016llX +%llX   (mem: %llX)\n", se->offs, se->fileSz, se->memSz);
+		}
 	}
 
 	elfHOffs = (1 + seHead->num_entries) * 0x20;
