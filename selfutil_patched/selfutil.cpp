@@ -358,8 +358,8 @@ bool SelfUtil::SaveToELF(string savePath)
 bool SelfUtil::Parse()
 {
 	if (data.size() < PS4_PAGE_SIZE) {
-		printf("Bad file size! (%d)\n", data.size());
-		return false;
+		printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
+		//return false;
 	}
 
 	seHead = (Self_Hdr*)&data[0];
