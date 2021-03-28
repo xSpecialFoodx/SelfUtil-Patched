@@ -20,13 +20,14 @@
 
 void print_usage()
 {
-	printf("selfutil [--input] [--output] [--dry-run] [--verbose] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
+	printf("selfutil [--input] [--output] [--dry-run] [--verbose] [--align-size] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
 }
 
 string input_file_path = "";
 string output_file_path = "";
 bool dry_run = false;
 bool verbose = false;
+bool align_size = false;
 bool patch_first_segment_duplicate = true;
 Elf64_Off patch_first_segment_safety_percentage = 10;// min amount of cells (in percentage) that should fit in other words
 bool patch_version_segment = true;
@@ -71,6 +72,8 @@ int main(int argc, char* argv[])
 				dry_run = true;
 			else if (args[inputted_args_index] == "--verbose")
 				verbose = true;
+			else if (args[inputted_args_index] == "--align-size")
+				align_size = true;
 			else if (args[inputted_args_index] == "--not-patch-first-segment-duplicate")
 				patch_first_segment_duplicate = false;
 			else if (args[inputted_args_index] == "--not-patch-version-segment")
@@ -108,6 +111,7 @@ int main(int argc, char* argv[])
 			, "Output File Name", fixed_output_file_path.c_str()
 			, "Dry Run", ((dry_run == true) ? "True" : "False")
 			, "Verbose", ((verbose == true) ? "True" : "False")
+			, "Align Size", ((align_size == true) ? "True" : "False")
 			, "Patch First Segment Duplicate", ((patch_first_segment_duplicate == true) ? "True" : "False")
 			, "Patch Version Segment", ((patch_version_segment == true) ? "True" : "False")
 			);
@@ -181,21 +185,62 @@ bool SelfUtil::SaveToELF(string savePath)
 		printf("SaveToELF(\"%s\")\n", savePath.c_str());
 	}
 
-	Elf64_Off first = 777777777, last = 0;
-	size_t saveSize = 0;
-	Elf64_Phdr* ph_PT_SCE_VERSION = NULL;
+	Elf64_Off first, last;
+	size_t saveSize;
+	Elf64_Phdr
+		*ph_first = NULL
+		, *ph_last = NULL
+		, *ph_PT_SCE_VERSION = NULL;
+
 	bool patched_PT_SCE_VERSION = false;
 
-	for (auto ph : phdrs) {
+	for (auto ph : phdrs)
+	{
 		if (ph->p_type == PT_SCE_VERSION)
 			ph_PT_SCE_VERSION = ph;
 
-		last = std::max(last, ph->p_offset);
-		if (0 != ph->p_offset)
-			first = std::min(first, ph->p_offset);
-		saveSize = std::max(saveSize, (size_t)(ph->p_offset + ph->p_filesz));
+		if (
+			ph_first == NULL
+			||
+			ph_first->p_offset == 0// try to get away from offset 0
+			||
+			(
+				// if the current first ph is not null and its offset is bigger than 0
+				// , then replace it only with a smaller ph that its offset is also bigger than 0
+				ph->p_offset > 0
+				&& ph->p_offset < ph_first->p_offset
+				)
+			)
+			ph_first = ph;
+
+		if (
+			ph_last == NULL
+			||
+			ph->p_offset > ph_last->p_offset
+			)
+			ph_last = ph;
 	}
-	saveSize = AlignUp<size_t>(saveSize, PS4_PAGE_SIZE);
+
+	if (ph_first == NULL)
+		first = 0;
+	else
+		first = ph_first->p_offset;
+
+	if (ph_last == NULL)
+	{
+		last = 0;
+
+		saveSize = 0;
+	}
+	else
+	{
+		last = ph_last->p_offset;
+
+		saveSize = (size_t)(ph_last->p_offset + ph_last->p_filesz);
+
+		if (align_size == true)
+			saveSize = AlignUp<size_t>(saveSize, 0x10);// in the original selfutil it was an alignment of PS4_PAGE_SIZE
+	}
 
 	if (verbose == true)
 	{
@@ -313,8 +358,11 @@ bool SelfUtil::SaveToELF(string savePath)
 
 	if (patch_first_segment_duplicate == true)
 		for (int first_index = 0; first_index < (first * (100 - patch_first_segment_safety_percentage) / 100); first_index++)
-			if (compare_u8_array(pd + first_index, pd + first, first - first_index) == true)
+			if (compare_u8_array(pd + first_index, pd + first, 0x000000C0) == true)
 			{
+				// was first - first_index instead of 0x000000C0
+				// , but usually the first section's important data is at the size of 0xC0 and that goes for all the modules
+
 				printf("\n");
 				printf("patching first segment duplicate\n");
 
@@ -358,7 +406,9 @@ bool SelfUtil::SaveToELF(string savePath)
 bool SelfUtil::Parse()
 {
 	if (data.size() < PS4_PAGE_SIZE) {
-		printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
+		if (verbose == true)
+			printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
+
 		//return false;
 	}
 
