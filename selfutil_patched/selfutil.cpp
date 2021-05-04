@@ -357,7 +357,7 @@ bool SelfUtil::SaveToELF(string savePath)
 			}
 
 	if (patch_first_segment_duplicate == true)
-		for (int first_index = 0; first_index < (first * (100 - patch_first_segment_safety_percentage) / 100); first_index++)
+		for (int first_index = 0; first_index < (first * (100 - patch_first_segment_safety_percentage) / 100) && first - first_index >= 0x000000C0; first_index++)
 			if (compare_u8_array(pd + first_index, pd + first, 0x000000C0) == true)
 			{
 				// was first - first_index instead of 0x000000C0
