@@ -29,7 +29,7 @@ bool dry_run = false;
 bool verbose = false;
 bool align_size = false;
 bool patch_first_segment_duplicate = true;
-Elf64_Off patch_first_segment_safety_percentage = 10;// min amount of cells (in percentage) that should fit in other words
+Elf64_Off patch_first_segment_safety_percentage = 2;// min amount of cells (in percentage) that should fit in other words
 bool patch_version_segment = true;
 
 int main(int argc, char* argv[])
@@ -358,7 +358,7 @@ bool SelfUtil::SaveToELF(string savePath)
 
 	if (patch_first_segment_duplicate == true)
 		for (int first_index = 0; first_index < (first * (100 - patch_first_segment_safety_percentage) / 100) && first - first_index >= 0x000000C0; first_index++)
-			if (compare_u8_array(pd + first_index, pd + first, 0x000000C0) == true)
+			if (compare_u8_array(pd + first_index, pd + first, (first - first_index >= 0x000000C0 ? 0x000000C0 : first - first_index)) == true)
 			{
 				// was first - first_index instead of 0x000000C0
 				// , but usually the first section's important data is at the size of 0xC0 and that goes for all the modules
