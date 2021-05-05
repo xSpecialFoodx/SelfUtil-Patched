@@ -32,6 +32,8 @@ bool patch_first_segment_duplicate = true;
 Elf64_Off patch_first_segment_safety_percentage = 2;// min amount of cells (in percentage) that should fit in other words
 bool patch_version_segment = true;
 
+int first_min_offset = -1;
+
 int main(int argc, char* argv[])
 {
 	vector<string> args;
@@ -357,28 +359,81 @@ bool SelfUtil::SaveToELF(string savePath)
 			}
 
 	if (patch_first_segment_duplicate == true)
-		for (int first_index = 0; first_index < (first * (100 - patch_first_segment_safety_percentage) / 100) && first - first_index >= 0x000000C0; first_index++)
-			if (compare_u8_array(pd + first_index, pd + first, (first - first_index >= 0x000000C0 ? 0x000000C0 : first - first_index)) == true)
+	{
+		int entries_amount = entries.size();
+
+		for (int entries_index = 0; entries_index < entries_amount; entries_index++)
+			if (
+				entries[entries_index]->offs - elfHOffs >= 0
+				&& entries[entries_index]->offs - elfHOffs < first
+				)
+			{
+				if (
+					first_min_offset == -1
+					|| entries[entries_index]->offs - elfHOffs > first_min_offset
+					)
+					first_min_offset = entries[entries_index]->offs - elfHOffs;
+			}
+
+		if (first_min_offset != -1)
+			if (pd[first_min_offset] == 0)
+			{
+				// go forward looking for data
+
+				for (int pd_index = 1; (Elf64_Off)first_min_offset + pd_index < first; pd_index++)
+					if (pd[first_min_offset + pd_index] != 0)
+					{
+						first_min_offset += pd_index - 1;// go 1 place before the zero
+
+						break;
+					}
+			}
+
+		for (
+			int first_index = 0;
+			(
+				first_min_offset == -1
+				|| first_index < first_min_offset
+				)
+			&& (
+				first_index < (first * (100 - patch_first_segment_safety_percentage) / 100)
+				&& first - first_index >= 0x000000C0
+				);
+			first_index++
+			)
+			if (
+				compare_u8_array(
+					pd + first_index
+					, pd + first
+					, (first - first_index >= 0x000000C0 ? 0x000000C0 : first - first_index)
+					) == true
+				)
 			{
 				// was first - first_index instead of 0x000000C0
 				// , but usually the first section's important data is at the size of 0xC0 and that goes for all the modules
 
-				printf("\n");
-				printf("patching first segment duplicate\n");
-
-				if (verbose == true)
-					printf(
-						"%s: 0x%08X\t%s: 0x%08X\n"
-						, "address", first_index
-						, "size", first - first_index
-						);
-
-				set_u8_array(pd + first_index, 0, first - first_index);
-
-				printf("patched first segment duplicate\n");
+				first_min_offset = first_index;
 
 				break;
 			}
+
+		if (first_min_offset != -1)
+		{
+			printf("\n");
+			printf("patching first segment duplicate\n");
+
+			if (verbose == true)
+				printf(
+					"%s: 0x%08X\t%s: 0x%08X\n"
+					, "address", first_min_offset
+					, "size", first - first_min_offset
+					);
+
+			set_u8_array(pd + first_min_offset, 0, first - first_min_offset);
+
+			printf("patched first segment duplicate\n");
+		}
+	}
 
 
 	if (dry_run == false)
