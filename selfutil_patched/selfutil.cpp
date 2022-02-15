@@ -20,13 +20,14 @@
 
 void print_usage()
 {
-	printf("selfutil [--input] [--output] [--dry-run] [--verbose] [--align-size] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
+	printf("selfutil [--input] [--output] [--dry-run] [--verbose] [--overwrite] [--align-size] [--not-patch-first-segment-duplicate] [--not-patch-version-segment]\n");
 }
 
 string input_file_path = "";
 string output_file_path = "";
 bool dry_run = false;
 bool verbose = false;
+bool overwrite = false;
 bool align_size = false;
 bool patch_first_segment_duplicate = true;
 Elf64_Off patch_first_segment_safety_percentage = 2;// min amount of cells (in percentage) that should fit in other words
@@ -74,6 +75,8 @@ int main(int argc, char* argv[])
 				dry_run = true;
 			else if (args[inputted_args_index] == "--verbose")
 				verbose = true;
+			else if (args[inputted_args_index] == "--overwrite")
+				overwrite = true;
 			else if (args[inputted_args_index] == "--align-size")
 				align_size = true;
 			else if (args[inputted_args_index] == "--not-patch-first-segment-duplicate")
@@ -100,11 +103,19 @@ int main(int argc, char* argv[])
 			fixed_output_file_path = output_file_path;
 		else
 		{
-			size_t newSize = input_file_path.rfind('.');	// *FIXME* if this is already named .elf it will save to same file!
-
 			fixed_output_file_path = input_file_path;
-			fixed_output_file_path.resize(newSize);
-			fixed_output_file_path += ".elf";
+
+			if (overwrite == false)
+			{
+				size_t newSize = input_file_path.rfind('.');	// *FIXME* if this is already named .elf it will save to same file!
+
+				if (newSize > 0)
+				{
+					fixed_output_file_path.resize(newSize);
+
+					fixed_output_file_path += ".elf";
+				}
+			}
 		}
 
 		printf(
@@ -113,6 +124,7 @@ int main(int argc, char* argv[])
 			, "Output File Name", fixed_output_file_path.c_str()
 			, "Dry Run", ((dry_run == true) ? "True" : "False")
 			, "Verbose", ((verbose == true) ? "True" : "False")
+			, "Overwrite", ((overwrite == true) ? "True" : "False")
 			, "Align Size", ((align_size == true) ? "True" : "False")
 			, "Patch First Segment Duplicate", ((patch_first_segment_duplicate == true) ? "True" : "False")
 			, "Patch Version Segment", ((patch_version_segment == true) ? "True" : "False")
