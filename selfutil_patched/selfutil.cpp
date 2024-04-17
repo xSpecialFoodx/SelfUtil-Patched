@@ -472,16 +472,28 @@ bool SelfUtil::SaveToELF(string savePath)
 
 bool SelfUtil::Parse()
 {
-	if (data.size() < PS4_PAGE_SIZE) {
-		if (verbose == true)
-			printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
-
-		//return false;
-	}
-
 	seHead = (Self_Hdr*)&data[0];
 
-	if (SELF_MAGIC != seHead->magic) {
+	if (seHead->magic == PS4_SELF_MAGIC)
+	{
+		if (verbose == true)
+			printf("Valid PS4 Magic");
+
+		if (data.size() < PS4_PAGE_SIZE)
+			if (verbose == true)
+				printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
+	}
+	else if (seHead->magic == PS5_SELF_MAGIC)
+	{
+		if (verbose == true)
+			printf("Valid PS5 Magic");
+
+		if (data.size() < PS5_PAGE_SIZE)
+			if (verbose == true)
+				printf("Small file size! (%d)\nContinuing regardless.\n", data.size());
+	}
+	else
+	{
 		printf("Invalid Magic! (0x%08X)\n", seHead->magic);
 		return false;
 	}

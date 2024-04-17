@@ -30,13 +30,18 @@ struct Self_Entry {
 
 
 #define PS4_PAGE_SIZE	0x4000
+#define PS5_PAGE_SIZE	0x4000
+
 #define PS4_PAGE_MASK	0x3FFF
+#define PS5_PAGE_MASK	0x3FFF
 
 
 
 
 #define ELF_MAGIC  0x464C457F // \x7F E L F
-#define SELF_MAGIC 0x1D3D154F
+
+#define PS4_SELF_MAGIC 0x1D3D154F
+#define PS5_SELF_MAGIC 0xEEF51454
 
 
 // ExInfo::ptype
