@@ -477,7 +477,7 @@ bool SelfUtil::Parse()
 	if (seHead->magic == PS4_SELF_MAGIC)
 	{
 		if (verbose == true)
-			printf("Valid PS4 Magic");
+			printf("Valid PS4 Magic\n");
 
 		if (data.size() < PS4_PAGE_SIZE)
 			if (verbose == true)
@@ -486,7 +486,7 @@ bool SelfUtil::Parse()
 	else if (seHead->magic == PS5_SELF_MAGIC)
 	{
 		if (verbose == true)
-			printf("Valid PS5 Magic");
+			printf("Valid PS5 Magic\n");
 
 		if (data.size() < PS5_PAGE_SIZE)
 			if (verbose == true)
